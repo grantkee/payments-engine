@@ -1,6 +1,6 @@
+use payments_engine::Engine;
+use std::{path, process};
 use structopt::StructOpt;
-use std::{process, path};
-use payments_engine;
 
 #[derive(StructOpt, Debug)]
 struct Opt {
@@ -8,12 +8,16 @@ struct Opt {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()>{
+async fn main() -> anyhow::Result<()> {
     let file = Opt::from_args();
     println!("file: {:?}", file.path);
 
-    if let Err(e) = payments_engine::run(file.path).await {
-        println!("Application error: {}", e);
+    let engine = Engine::default();
+    println!("engine defaults transactions: {:?}", engine.transactions);
+    println!("engine defaults clients: {:?}", engine.clients);
+
+    if let Err(e) = engine.read(file.path).await {
+        println!("Application error while reading CSV: {}", e);
         process::exit(1);
     }
 
