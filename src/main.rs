@@ -12,7 +12,7 @@ async fn main() -> anyhow::Result<()> {
     let file = Opt::from_args();
     println!("file: {:?}", file.path);
 
-    let engine = Engine::default();
+    let mut engine = Engine::default();
     println!("engine defaults transactions: {:?}", engine.transactions);
     println!("engine defaults clients: {:?}", engine.clients);
 

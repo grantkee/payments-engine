@@ -41,9 +41,8 @@ pub enum TransactionType {
 /// id, and the amount of the transaction.
 #[derive(Debug, Deserialize)]
 pub struct TransactionInfo {
-    r#type: String,
-    client: u16,
-    tx: u32,
-    amount: f64,
+    pub r#type: String,
+    pub client: u16,
+    pub tx: u32,
+    pub amount: f64,
 }
-

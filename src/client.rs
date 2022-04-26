@@ -13,7 +13,7 @@ pub struct Client {
 }
 
 /// Unique struct.
-/// 
+///
 /// Minimum amount of information needed for
 /// managing client's transactions.
 #[derive(Debug, Deserialize)]
@@ -28,14 +28,14 @@ pub struct ClientInfo {
 struct ClientFunds {
     // total = available + held
     available: f64,
-    held: f64
+    held: f64,
 }
 
 impl ClientInfo {
     /// Create unique client with minimum amount
-    /// of information needed to process all 
+    /// of information needed to process all
     /// transactions.
-    pub async fn new(id: u16) -> Self {
+    pub fn new(id: u16) -> Self {
         Self {
             id,
             funds: ClientFunds::default(),
@@ -45,13 +45,12 @@ impl ClientInfo {
 
     // only used in trait impl From<ClientInfo>
     // not async to prevent heal allocation
-    /// Calculate total for Client based on 
+    /// Calculate total for Client based on
     /// available and held funds.
-    pub fn get_total(&self) -> f64 {
+    fn get_total(&self) -> f64 {
         self.funds.held + self.funds.available
     }
 }
-
 
 /// Create the Client struct from ClientInfo.
 /// Used to write back to CSV.
@@ -75,7 +74,7 @@ mod tests {
 
     #[tokio::test]
     async fn new_client_defaults() {
-        let client = ClientInfo::new(1).await;
+        let client = ClientInfo::new(1);
         assert_eq!(client.id, 1);
         assert_eq!(client.funds.available, 0.0);
         assert_eq!(client.funds.held, 0.0);
@@ -84,7 +83,7 @@ mod tests {
 
     #[tokio::test]
     async fn create_client_from_client_info() {
-        let client_info = ClientInfo::new(1).await;
+        let client_info = ClientInfo::new(1);
         let client = Client::from(client_info);
         assert_eq!(client.id, 1);
         assert_eq!(client.available, 0.0);
