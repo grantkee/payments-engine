@@ -1,3 +1,4 @@
+use crate::transaction::TransactionType;
 use serde::Deserialize;
 
 /// Unique struct.
@@ -21,6 +22,7 @@ pub struct ClientInfo {
     id: u16,
     funds: ClientFunds,
     locked: bool,
+    disputed_funds: Vec<u32>,
 }
 
 /// Struct for handling client's funds.
@@ -31,6 +33,9 @@ struct ClientFunds {
     held: f64,
 }
 
+/// Result alias that returns a custom Error.
+type Result<T> = std::result::Result<T, crate::Error>;
+
 impl ClientInfo {
     /// Create unique client with minimum amount
     /// of information needed to process all
@@ -40,19 +45,66 @@ impl ClientInfo {
             id,
             funds: ClientFunds::default(),
             locked: false,
+            disputed_funds: Vec::new(),
         }
     }
 
-    pub async fn deposit(&mut self, amount: f64) {
-        self.funds.available += amount
+    pub async fn deposit(&mut self, amount: f64) -> Result<()> {
+        match self.locked {
+            true => Err(crate::Error::AccountIsLocked),
+            false => {
+                self.funds.available += amount;
+                Ok(())
+            }
+        }
     }
 
-    pub async fn withdraw(&mut self, amount: f64) {
-        self.funds.available -= amount
+    pub async fn withdraw(&mut self, amount: f64) -> Result<()> {
+        match self.locked {
+            true => Err(crate::Error::AccountIsLocked),
+            false => {
+                if self.funds.available > amount {
+                    self.funds.available -= amount;
+                    Ok(())
+                } else {
+                    Err(crate::Error::InsufficientFundsAvailable)
+                }
+            }
+        }
     }
 
-    pub async fn dispute(&mut self, amount: f64) {
-        self.funds.available -= amount
+    pub async fn dispute_or_resolve(
+        &mut self,
+        t_type: &TransactionType,
+        t_id: u32,
+        amount: f64,
+    ) -> Result<()> {
+        match t_type {
+            &TransactionType::Dispute => {
+                println!("DISPUTED TRANSACTION!!!");
+                self.funds.available -= amount;
+                self.funds.held += amount;
+                self.disputed_funds.push(t_id);
+                Ok(())
+            }
+            &TransactionType::Resolve => {
+                println!("RESOLVE TRANSACTION!!!");
+                if let Some(index) = self.disputed_funds.iter().position(|val| *val == t_id) {
+                    println!("real resolution!!!");
+                    self.funds.available += amount;
+                    self.funds.held -= amount;
+                    self.disputed_funds.remove(index);
+                }
+                Ok(())
+            }
+            _ => Err(crate::Error::UnknownDisputeOrResolutionType),
+        }
+    }
+
+    pub async fn chargeback(&mut self, amount: f64) -> Result<()> {
+        self.locked = true;
+        self.funds.held -= amount;
+        Ok(())
     }
 
     // only used in trait impl From<ClientInfo>

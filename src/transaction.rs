@@ -3,6 +3,7 @@ use serde::Deserialize;
 use std::convert::TryFrom;
 
 /// Defines the type of transaction.
+#[derive(Debug, PartialEq)]
 pub enum TransactionType {
     /// A deposit is a credit to the client's asset account,
     /// and increases the available and total funds of the
