@@ -81,22 +81,56 @@ impl Engine {
                 .entry(transaction_info.client)
                 .or_insert_with_key(|_| ClientInfo::new(transaction_info.client));
 
-            let transaction_type = TransactionType::try_from((transaction_info.r#type.as_str(), Some(transaction_info.amount).unwrap()))?;
+            println!("\n\nt_type: {:?}", transaction_info.r#type);
+
+            let transaction_type = TransactionType::try_from((
+                transaction_info.r#type.as_str(),
+                Some(transaction_info.amount).unwrap(),
+            ))?;
+
+            println!("transactions: {:?}", self.transactions);
 
             match transaction_type {
-                TransactionType::Deposit(amount) => client.deposit(amount).await,
-                TransactionType::Withdrawal(amount) => client.withdraw(amount).await,
-                TransactionType::Dispute => {
-                    if transaction.is_some() {
-                        println!("PREVIOUS TRANSACTION ACQUIRED");
-                        // somewhat dangerous
-                        client.dispute(transaction.ok_or(Error::UnableToProcessTransaction)?.amount.ok_or(Error::UnableToProcessTransaction)?).await
-                    }
+                TransactionType::Deposit(amount) => {
+                    client.deposit(amount).await?;
+                    self.transactions
+                        .insert(transaction_info.tx, transaction_info.clone());
                 }
-                _ => return Err(Error::UnableToProcessTransaction)
+                TransactionType::Withdrawal(amount) => {
+                    client.withdraw(amount).await?;
+                    self.transactions
+                        .insert(transaction_info.tx, transaction_info.clone());
+                }
+                TransactionType::Dispute | TransactionType::Resolve => {
+                    if transaction.is_some() {
+                        println!("transaction is Some()");
+                        client
+                            .dispute_or_resolve(
+                                &transaction_type,
+                                transaction_info.tx,
+                                transaction
+                                    .ok_or(Error::UnableToProcessTransaction)?
+                                    .amount
+                                    .ok_or(Error::UnableToProcessAmount)?,
+                            )
+                            .await?
+                    } else {
+                        println!("Transaction ignored.");
+                    }
+                    // return Ok(())
+                }
+                TransactionType::Chargeback => {
+                    client
+                        .chargeback(
+                            transaction
+                                .ok_or(Error::UnableToProcessTransaction)?
+                                .amount
+                                .ok_or(Error::UnableToProcessAmount)?,
+                        )
+                        .await?
+                }
+                _ => return Err(Error::UnableToProcessTransaction),
             }
-
-            self.transactions.insert(transaction_info.tx, transaction_info.clone());
 
             for (k, v) in &self.clients {
                 println!("{:?} - {:?}", k, v);

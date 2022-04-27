@@ -15,6 +15,14 @@ pub enum Error {
     AmountMissing,
     #[error("Unable to process transaction.")]
     UnableToProcessTransaction,
+    #[error("Unable to process amount in dispute transaction.")]
+    UnableToProcessAmount,
+    #[error("Unable to process withdrawal due to insufficient funds available.")]
+    InsufficientFundsAvailable,
+    #[error("Unable to handle dispute or resolution due to unknown transaction type.")]
+    UnknownDisputeOrResolutionType,
+    #[error("Account is locked.")]
+    AccountIsLocked,
     #[error("Unknown error has occurred.")]
     UnknownError,
 }
