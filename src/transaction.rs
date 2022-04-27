@@ -1,4 +1,6 @@
+use crate::Error;
 use serde::Deserialize;
+use std::convert::TryFrom;
 
 /// Defines the type of transaction.
 pub enum TransactionType {
@@ -36,13 +38,34 @@ pub enum TransactionType {
     Chargeback,
 }
 
+/// Generic trait for safe type conversions.
+/// TryFrom allows reusable memory allocated for String.
+impl TryFrom<(&str, Option<f64>)> for TransactionType {
+    type Error = crate::Error;
+
+    fn try_from((transaction, amount): (&str, Option<f64>)) -> Result<TransactionType, Error> {
+        match transaction {
+            "deposit" => Ok(TransactionType::Deposit(
+                amount.ok_or(Error::AmountMissing)?,
+            )),
+            "withdrawal" => Ok(TransactionType::Withdrawal(
+                amount.ok_or(Error::AmountMissing)?,
+            )),
+            "dispute" => Ok(TransactionType::Dispute),
+            "resolve" => Ok(TransactionType::Resolve),
+            "chargeback" => Ok(TransactionType::Chargeback),
+            _ => Err(crate::Error::UnknownTransactionType(transaction.to_owned())),
+        }
+    }
+}
+
 /// Information regarding the transaction. Includes the
 /// transaction type, the client's id, the transaction's
 /// id, and the amount of the transaction.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TransactionInfo {
     pub r#type: String,
     pub client: u16,
     pub tx: u32,
-    pub amount: f64,
+    pub amount: Option<f64>,
 }

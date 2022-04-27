@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     println!("engine defaults transactions: {:?}", engine.transactions);
     println!("engine defaults clients: {:?}", engine.clients);
 
-    if let Err(e) = engine.read(file.path).await {
+    if let Err(e) = engine.stream(file.path).await {
         println!("Application error while reading CSV: {}", e);
         process::exit(1);
     }

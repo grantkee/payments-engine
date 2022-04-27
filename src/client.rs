@@ -43,6 +43,18 @@ impl ClientInfo {
         }
     }
 
+    pub async fn deposit(&mut self, amount: f64) {
+        self.funds.available += amount
+    }
+
+    pub async fn withdraw(&mut self, amount: f64) {
+        self.funds.available -= amount
+    }
+
+    pub async fn dispute(&mut self, amount: f64) {
+        self.funds.available -= amount
+    }
+
     // only used in trait impl From<ClientInfo>
     // not async to prevent heal allocation
     /// Calculate total for Client based on
