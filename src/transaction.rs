@@ -8,12 +8,12 @@ pub enum TransactionType {
     /// A deposit is a credit to the client's asset account,
     /// and increases the available and total funds of the
     /// client account.
-    Deposit(f64),
+    Deposit(f32),
 
     /// A withdraw is a debit to the client's asset account,
     /// and decreases the available and total funds of the
     /// client account.
-    Withdrawal(f64),
+    Withdrawal(f32),
 
     /// A dispute represents a client's claim that a
     /// transaction was erroneous and should be reversed.
@@ -41,10 +41,10 @@ pub enum TransactionType {
 
 /// Generic trait for safe type conversions.
 /// TryFrom allows reusable memory allocated for String.
-impl TryFrom<(&str, Option<f64>)> for TransactionType {
+impl TryFrom<(&str, Option<f32>)> for TransactionType {
     type Error = crate::Error;
 
-    fn try_from((transaction, amount): (&str, Option<f64>)) -> Result<TransactionType, Error> {
+    fn try_from((transaction, amount): (&str, Option<f32>)) -> Result<TransactionType, Error> {
         match transaction {
             "deposit" => Ok(TransactionType::Deposit(
                 amount.ok_or(Error::AmountMissing)?,
@@ -68,5 +68,5 @@ pub struct TransactionInfo {
     pub r#type: String,
     pub client: u16,
     pub tx: u32,
-    pub amount: Option<f64>,
+    pub amount: Option<f32>,
 }
