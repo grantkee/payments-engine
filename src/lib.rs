@@ -1,7 +1,7 @@
 pub use client::{Client, ClientInfo};
 pub use error::Error;
 pub use std::{collections::HashMap, path};
-pub use transaction::TransactionInfo;
+pub use transaction::{TransactionInfo, TransactionType};
 
 mod client;
 mod error;
@@ -16,6 +16,7 @@ pub struct Engine {
 
 impl Engine {
     /// Read the CSV file from the argument provided to CLI.
+    /// Loads all records into memory at once.
     pub async fn read(&mut self, path: path::PathBuf) -> Result<(), Error> {
         let mut rdr = csv::ReaderBuilder::new()
             .has_headers(true)
@@ -55,6 +56,51 @@ impl Engine {
 
         for (k, v) in &self.clients {
             println!("{:?} - {:?}", k, v);
+        }
+
+        Ok(())
+    }
+
+    /// Stream records to save resources.
+    /// This approach assumes that all transaction ids are guaranteed to be unique.
+    pub async fn stream(&mut self, path: path::PathBuf) -> Result<(), Error> {
+        let mut rdr = csv::ReaderBuilder::new()
+            .has_headers(true)
+            .trim(csv::Trim::All)
+            .flexible(true)
+            .from_path(path)?;
+
+        for result in rdr.into_deserialize() {
+            let transaction_info: TransactionInfo = result?;
+            // println!("result: {:?}", transaction_info);
+            let transaction = self.transactions.get(&transaction_info.tx);
+
+            // TODO: implement async
+            let mut client = self
+                .clients
+                .entry(transaction_info.client)
+                .or_insert_with_key(|_| ClientInfo::new(transaction_info.client));
+
+            let transaction_type = TransactionType::try_from((transaction_info.r#type.as_str(), Some(transaction_info.amount).unwrap()))?;
+
+            match transaction_type {
+                TransactionType::Deposit(amount) => client.deposit(amount).await,
+                TransactionType::Withdrawal(amount) => client.withdraw(amount).await,
+                TransactionType::Dispute => {
+                    if transaction.is_some() {
+                        println!("PREVIOUS TRANSACTION ACQUIRED");
+                        // somewhat dangerous
+                        client.dispute(transaction.ok_or(Error::UnableToProcessTransaction)?.amount.ok_or(Error::UnableToProcessTransaction)?).await
+                    }
+                }
+                _ => return Err(Error::UnableToProcessTransaction)
+            }
+
+            self.transactions.insert(transaction_info.tx, transaction_info.clone());
+
+            for (k, v) in &self.clients {
+                println!("{:?} - {:?}", k, v);
+            }
         }
 
         Ok(())
