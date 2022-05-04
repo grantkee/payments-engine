@@ -18,7 +18,8 @@ pub struct Client {
 
 /// Serialize the f32 values as rounded to 4 decimal places.
 fn serialize_f32<S>(num: &f32, s: S) -> std::result::Result<S::Ok, S::Error>
-where S: Serializer,
+where
+    S: Serializer,
 {
     s.serialize_str(format!("{:.4}", num).as_str())
 }
@@ -38,6 +39,8 @@ pub struct ClientInfo {
 /// Struct for handling client's funds.
 #[derive(Debug, Default, Deserialize)]
 struct ClientFunds {
+    // total is calculated when
+    // creating Client from ClientInfo
     // total = available + held
     available: f32,
     held: f32,
@@ -60,43 +63,33 @@ impl ClientInfo {
     }
 
     /// Handle deposit transaction. Increase available (and thus total) funds.
-    /// Do not allow any transaction if account is locked.
+    /// Do not process transaction if account is locked.
     pub async fn deposit(&mut self, amount: f32) -> Result<()> {
-        match self.locked {
-            true => Err(crate::Error::AccountIsLocked),
-            false => {
-                self.funds.available += amount;
-                Ok(())
-            }
+        if !self.locked {
+            self.funds.available += amount;
         }
+        Ok(())
     }
 
     /// Handle withdraw transactions. Decrease available (and thus total)
     /// funds, only if sufficient funds are available.
-    /// Do not allow any transaction if account is locked.
-    /// Return an error if funds are insufficient.
+    /// Do not process transaction if account is locked, or the
+    /// available funds are less than the amount to withdraw.
     pub async fn withdraw(&mut self, amount: f32) -> Result<()> {
-        match self.locked {
-            true => Err(crate::Error::AccountIsLocked),
-            false => {
-                if self.funds.available >= amount {
-                    self.funds.available -= amount;
-                    Ok(())
-                } else {
-                    Err(crate::Error::InsufficientFundsAvailable)
-                }
-            }
+        if !self.locked && self.funds.available >= amount {
+            self.funds.available -= amount;
         }
+        Ok(())
     }
 
     /// Handle dispute and resolve transactions.
     /// Keep track of disputed funds in ClientInfo.
     /// Locked accounts can still update disputed transactions.
-    /// 
+    ///
     /// For disputes, hold associated funds and decrease available
     /// funds. Transactions must exist to call this method.
-    /// 
-    /// For resolves, associated held funds are released. The 
+    ///
+    /// For resolves, associated held funds are released. The
     /// transaction must exist and be under dispute to call this
     /// method.
     //
@@ -129,9 +122,12 @@ impl ClientInfo {
 
     /// Handle client chargebacks.
     /// Lock the client's account if a chargeback occurs.
-    pub async fn chargeback(&mut self, amount: f32) -> Result<()> {
-        self.locked = true;
-        self.funds.held -= amount;
+    pub async fn chargeback(&mut self, t_id: u32, amount: f32) -> Result<()> {
+        // only process chargebacks for disputed transactions
+        if let Some(_) = self.disputed_funds.iter().position(|val| *val == t_id) {
+            self.locked = true;
+            self.funds.held -= amount;
+        }
         Ok(())
     }
 
@@ -200,7 +196,8 @@ mod tests {
         let mut client_info = ClientInfo::new(1);
         let _deposit = client_info.deposit(1.0).await;
         let _withdraw = client_info.withdraw(0.02).await;
-        assert_eq!(client_info.funds.available, 0.98)
+        assert_eq!(client_info.funds.available, 0.98);
+        assert_eq!(client_info.funds.held, 0.0);
     }
 
     // client cannnot withdraw with insufficient funds
@@ -208,9 +205,9 @@ mod tests {
     async fn client_cannot_withdraw() {
         let mut client_info = ClientInfo::new(1);
         let _deposit = client_info.deposit(1.0).await;
-        let withdraw = client_info.withdraw(3.02).await;
+        let _withdraw = client_info.withdraw(3.02).await;
         assert_eq!(client_info.funds.available, 1.0);
-        assert!(withdraw.is_err())
+        assert_eq!(client_info.funds.held, 0.0);
     }
 
     // client cannot withdraw or deposet when account is locked
@@ -218,12 +215,14 @@ mod tests {
     async fn client_account_is_locked() {
         let mut client_info = ClientInfo::new(1);
         let _deposit = client_info.deposit(1.0006).await;
-        let _chargeback = client_info.chargeback(1.0006).await;
-        let withdraw_attempt = client_info.withdraw(0.03).await;
-        let deposit_attempt = client_info.deposit(0.01).await;
+        let _dispute = client_info
+            .dispute_or_resolve(&TransactionType::Dispute, 1, 1.0006)
+            .await;
+        let _chargeback = client_info.chargeback(1, 1.0006).await;
+        let _withdraw_attempt = client_info.withdraw(0.03).await;
+        let _deposit_attempt = client_info.deposit(0.01).await;
         assert_eq!(client_info.locked, true);
-        assert!(withdraw_attempt.is_err());
-        assert!(deposit_attempt.is_err())
+        assert_eq!(client_info.funds.available, 0.0);
+        assert_eq!(client_info.funds.held, 0.0);
     }
-
 }
