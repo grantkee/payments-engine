@@ -59,20 +59,19 @@ impl Engine {
                         // for their own account.
                         if transaction.client == client.id {
                             client
-                            .dispute_or_resolve(
-                                &transaction_type,
-                                transaction_info.tx,
-                                transaction
-                                .amount
-                                .ok_or(Error::UnableToProcessAmount)?,
-                            )
-                            .await?
+                                .dispute_or_resolve(
+                                    &transaction_type,
+                                    transaction_info.tx,
+                                    transaction.amount.ok_or(Error::UnableToProcessAmount)?,
+                                )
+                                .await?
                         }
                     }
                 }
                 TransactionType::Chargeback => {
                     client
                         .chargeback(
+                            transaction_info.tx,
                             transaction
                                 .ok_or(Error::UnableToProcessTransaction)?
                                 .amount
