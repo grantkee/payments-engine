@@ -1,6 +1,7 @@
 pub use client::{Client, ClientInfo};
 pub use error::Error;
-pub use std::{collections::HashMap, io, path};
+pub use std::{collections::HashMap, io, path, sync::Arc};
+pub use tokio::sync::Mutex;
 pub use transaction::{TransactionInfo, TransactionType};
 
 mod client;
@@ -11,7 +12,7 @@ mod transaction;
 pub struct Engine {
     // consider using BTreeMap if sorting by ids
     pub transactions: HashMap<u32, TransactionInfo>,
-    pub clients: HashMap<u16, ClientInfo>,
+    pub clients: Arc<Mutex<HashMap<u16, ClientInfo>>>,
 }
 
 impl Engine {
@@ -28,9 +29,8 @@ impl Engine {
             let transaction_info: TransactionInfo = result?;
             let transaction = self.transactions.get(&transaction_info.tx);
 
-            // TODO: implement async
-            let client = self
-                .clients
+            let mut client = self.clients.lock().await;
+            let client = client
                 .entry(transaction_info.client)
                 .or_insert_with_key(|_| ClientInfo::new(transaction_info.client));
 
@@ -89,7 +89,13 @@ impl Engine {
     pub async fn write(&self) -> Result<(), Error> {
         let mut wtr = csv::Writer::from_writer(io::stdout());
 
-        for client in self.clients.iter().map(|(_, client)| Client::from(client)) {
+        for client in self
+            .clients
+            .lock()
+            .await
+            .iter()
+            .map(|(_, client)| Client::from(client))
+        {
             wtr.serialize(client)?;
         }
 
@@ -124,7 +130,7 @@ mod tests {
     async fn new_engine_defaults() {
         let mut engine = Engine::default();
         assert!(engine.transactions.is_empty());
-        assert!(engine.clients.is_empty());
+        assert!(engine.clients.lock().await.is_empty());
     }
 
     #[tokio::test]
