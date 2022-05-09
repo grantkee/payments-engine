@@ -17,7 +17,10 @@ pub struct Client {
 }
 
 /// Serialize the f32 values as rounded to 4 decimal places.
-fn serialize_f32<S: Serializer>(num: &f32, s: S) -> std::result::Result<S::Ok, S::Error> {
+fn serialize_f32<S>(num: &f32, s: S) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
     s.serialize_str(format!("{:.4}", num).as_str())
 }
 
